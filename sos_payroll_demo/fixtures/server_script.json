@@ -1,0 +1,21 @@
+[
+ {
+  "allow_guest": 0,
+  "api_method": null,
+  "cron_format": null,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "Before Validate",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2025-06-29 22:44:50.418737",
+  "module": null,
+  "name": "Salary Slip - CBE Rate & Basic Salary Automation",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": null,
+  "script": "import frappe\r\nimport requests\r\nfrom frappe.utils import flt\r\n\r\n# Try fetching rate from your CBE Exchange Rate table; if missing, call external API and save\r\ndef get_cbe_rate(posting_date):\r\n    rate = frappe.get_value(\"CBE Exchange Rate\", {\"date\": posting_date}, \"rate\")\r\n    if rate:\r\n        return flt(rate)\r\n    # Fallback: call public exchange-rate API (replace with your CBE-sourced endpoint)\r\n    resp = requests.get(\"https://api.exchangerate.host/latest\", params={\"base\": \"USD\", \"symbols\": \"ETB\"})\r\n    data = resp.json()\r\n    rate = flt(data.get(\"rates\", {}).get(\"ETB\", 0))\r\n    # Save for future use\r\n    if rate:\r\n        frappe.get_doc({\r\n            \"doctype\": \"CBE Exchange Rate\",\r\n            \"date\": posting_date,\r\n            \"rate\": rate\r\n        }).insert(ignore_permissions=True)\r\n    return rate\r\n\r\n# Main hook: runs before each Salary Slip is validated\r\ndef before_validate(doc, method):\r\n    # 1) Fetch or set the exchange rate on the slip\r\n    rate = get_cbe_rate(doc.posting_date)\r\n    doc.exchange_rate = rate\r\n\r\n    # 2) Compute Basic Salary in ETB from USD\r\n    usd = flt(doc.salary_in_usd or 0)\r\n    basic_etb = usd * rate\r\n\r\n    # 3) Apply to the “Basic Salary” earning line\r\n    for row in doc.earnings:\r\n        if row.salary_component == \"Basic Salary\":\r\n            row.amount = basic_etb\r\n\r\n    # 4) Recalculate totals\r\n    doc.calculate_total_earnings()\r\n    doc.calculate_total_deductions()\r\n    doc.net_pay = doc.total_earnings - doc.total_deductions\r\n",
+  "script_type": "DocType Event"
+ }
+]

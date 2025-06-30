@@ -5,6 +5,13 @@ app_description = "this is a demo payroll system setup to test erpnext capabilit
 app_email = "abel.m@cleandataservices.com"
 app_license = "mit"
 
+fixtures = [
+  "Custom Field",
+  "Server Script",
+  "CBE Exchange Rate",
+  "Property Setter"
+]
+
 # Apps
 # ------------------
 
